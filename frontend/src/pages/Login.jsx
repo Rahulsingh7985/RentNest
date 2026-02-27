@@ -1,12 +1,17 @@
 import React, { useContext } from "react";
 import { AuthDataContext } from "../context/AuthContext";
 import axios from "axios";
+import { UserDataContext } from "../context/UserContext";
+import { useNavigate } from "react-router-dom";
+
 
 function Login() {
+    const navigate = useNavigate();
     let {serverUrl} = useContext(AuthDataContext);
     let [name, setName] = React.useState("");
     let [email, setEmail] = React.useState("");
     let [password, setPassword] = React.useState("");
+    let {userData, setUserData} = useContext(UserDataContext);
 
     const handleLogin = async (e) => {
         try {
@@ -14,10 +19,12 @@ function Login() {
             let result = await axios.post(serverUrl + "/api/auth/signIn", {
                 email,
                 password
-            })
+            },{withCredentials: true})
+            setUserData(result.data);
+            navigate("/")
             console.log("Success:", result.data);
         } catch (error) {
-            console.log("Full Error:", error.response);
+            console.log("Full Error:", error);
             console.log("Message:", error.response?.data);
         }
     }
@@ -58,7 +65,7 @@ function Login() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Create an account?{" "}
-          <span className="text-lime-700 font-medium cursor-pointer hover:underline">
+          <span className="text-lime-700 font-medium cursor-pointer hover:underline" onClick={()=>navigate("/signup")}>
             Sign up
           </span>
         </p>

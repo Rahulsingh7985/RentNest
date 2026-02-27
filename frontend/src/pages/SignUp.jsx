@@ -1,12 +1,16 @@
 import React, { useContext } from "react";
 import { AuthDataContext } from "../context/AuthContext";
 import axios from "axios";
+import { UserDataContext } from "../context/UserContext";
+import { useNavigate } from "react-router-dom";
 
 function SignUp() {
     let {serverUrl} = useContext(AuthDataContext);
     let [name, setName] = React.useState("");
     let [email, setEmail] = React.useState("");
     let [password, setPassword] = React.useState("");
+    let {userData, setUserData} = useContext(UserDataContext);
+    const navigate = useNavigate();
 
     const handleSignUp = async (e) => {
         try {
@@ -15,7 +19,9 @@ function SignUp() {
                 name,
                 email,
                 password
-            })
+            },{withCredentials: true})
+            setUserData(result.data);
+            navigate("/")
             console.log("Success:", result.data);
         } catch (error) {
             console.log("Full Error:", error.response);
@@ -73,7 +79,7 @@ function SignUp() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{" "}
-          <span className="text-lime-700 font-medium cursor-pointer hover:underline">
+          <span className="text-lime-700 font-medium cursor-pointer hover:underline" onClick={()=>navigate("/login")}>
             Log in
           </span>
         </p>
