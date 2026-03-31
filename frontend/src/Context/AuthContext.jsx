@@ -1,7 +1,7 @@
 import React, { createContext, useState } from 'react'
 export const authDataContext = createContext()
 function AuthContext({children}) {
-    const serverUrl ="http://localhost:8000"   //"https://rentnest-backend-ob4y.onrender.com"
+    const serverUrl ="https://rentnest-backend-ob4y.onrender.com" //"http://localhost:8000" 
 
     let [loading,setLoading]=useState(false)
 
