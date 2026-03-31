@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react'
+import React, { useContext, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FaStar, FaMapMarkerAlt } from 'react-icons/fa'
 import { GiConfirmed } from 'react-icons/gi'
@@ -7,258 +7,184 @@ import { userDataContext } from '../Context/UserContext'
 import { listingDataContext } from '../Context/ListingContext'
 import { bookingDataContext } from '../Context/BookingContext'
 
-/* ─── tiny keyframe injection (only once) ─── */
 const STYLE = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');
-  @keyframes fadeInScale {
-    from { opacity: 0; transform: scale(.94); }
-    to   { opacity: 1; transform: scale(1);   }
-  }
-  .card-popup { animation: fadeInScale .18s ease both; }
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+.card-popup { animation: fadeInScale .18s ease both; }
 `
 
 function Card({ title, landMark, image1, image2, image3, rent, city, id, ratings, isBooked, host, checkOut }) {
-  const navigate    = useNavigate()
-  const { userData }        = useContext(userDataContext)
-  const { handleViewCard }  = useContext(listingDataContext)
-  const { cancelBooking }   = useContext(bookingDataContext)
 
-  const [popUp,   setPopUp]   = useState(false)
-  const [imgIdx,  setImgIdx]  = useState(0)
+  const navigate = useNavigate()
+  const { userData } = useContext(userDataContext)
+  const { handleViewCard } = useContext(listingDataContext)
+  const { cancelBooking } = useContext(bookingDataContext)
+
+  const [popUp, setPopUp] = useState(false)
+  const [imgIdx, setImgIdx] = useState(0)
   const [showArr, setShowArr] = useState(false)
 
-  /* ── Auto-expire: treat as NOT booked if checkout date has passed ── */
-  const isExpired    = checkOut && new Date(checkOut) < new Date()
-  const activeBooked = isBooked && !isExpired   // what the UI actually shows
+  /* ✅ MEMOIZED IMAGES */
+  const images = useMemo(() => [image1, image2, image3], [image1, image2, image3])
 
-  const images = [image1, image2, image3]
+  /* ✅ BOOKING STATE */
+  const isExpired = checkOut && new Date(checkOut) < new Date()
+  const activeBooked = isBooked && !isExpired
 
+  /* ✅ CLICK HANDLER */
   const handleClick = () => {
     if (popUp) return
-    if (userData) handleViewCard(id)
-    else navigate('/login')
+    userData ? handleViewCard(id) : navigate('/login')
   }
 
+  /* ✅ IMAGE CHANGE */
   const changeImg = (e, dir) => {
     e.stopPropagation()
-    setImgIdx(i => (i + dir + 3) % 3)
+    setImgIdx(prev => (prev + dir + images.length) % images.length)
   }
 
-  /* average rating display */
-  const avgRating = Array.isArray(ratings)
-    ? ratings.length
-      ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
-      : '—'
-    : ratings ?? '—'
+  /* ✅ AVG RATING */
+  const avgRating = useMemo(() => {
+    if (Array.isArray(ratings)) {
+      return ratings.length
+        ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
+        : '—'
+    }
+    return ratings ?? '—'
+  }, [ratings])
 
   return (
     <>
       <style>{STYLE}</style>
 
       <div
-        className={`
-          relative  w-[340px] max-w-[92vw] rounded-2xl overflow-hidden bg-white
-          border border-stone-200/70
-          shadow-[0_4px_24px_rgba(80,40,20,0.10)]
-          hover:shadow-[0_16px_48px_rgba(80,40,20,0.18)]
-          hover:-translate-y-1.5 hover:scale-[1.012]
-          transition-all duration-300 ease-[cubic-bezier(.22,.68,0,1.2)]
-          cursor-pointer 
-        `}
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
+        className="relative w-[340px] max-w-[92vw] rounded-2xl overflow-hidden bg-white
+                   border border-gray-200 shadow-md hover:shadow-xl
+                   transition-all duration-300 hover:-translate-y-1 cursor-pointer"
         onClick={!activeBooked ? handleClick : undefined}
       >
 
-        {/* ══════════════════════════════════
-            IMAGE CAROUSEL
-        ══════════════════════════════════ */}
+        {/* IMAGE SECTION */}
         <div
-          className="relative h-[220px] overflow-hidden bg-stone-100"
+          className="relative h-[220px] overflow-hidden"
           onMouseEnter={() => setShowArr(true)}
           onMouseLeave={() => setShowArr(false)}
         >
-          {/* track */}
+          {/* SLIDER */}
           <div
-            className="flex h-full transition-transform duration-[450ms] ease-[cubic-bezier(.77,0,.175,1)]"
-            style={{ width: '300%', transform: `translateX(-${(imgIdx * 100) / 3}%)` }}
+            className="flex h-full transition-transform duration-500"
+            style={{ transform: `translateX(-${imgIdx * 100}%)` }}
           >
-            {images.map((src, i) => (
+            {images.map((img, i) => (
               <img
                 key={i}
-                src={src}
-                alt={`${title} ${i + 1}`}
-                className="h-full object-cover flex-shrink-0"
-                style={{ width: '33.333%' }}
+                src={img}
+                className="w-full h-full object-cover flex-shrink-0"
               />
             ))}
           </div>
 
-          {/* dark gradient for readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
+          {/* GRADIENT */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
 
-          {/* prev arrow */}
-          <button
-            className={`
-              absolute left-2.5 top-1/2 -translate-y-1/2 z-10
-              w-[30px] h-[30px] rounded-full bg-white/85 border-none
-              flex items-center justify-center text-stone-600 text-sm
-              shadow-md transition-opacity duration-200
-              ${showArr ? 'opacity-100' : 'opacity-0'}
-              hover:bg-white
-            `}
-            onClick={e => changeImg(e, -1)}
-          >‹</button>
-
-          {/* next arrow */}
-          <button
-            className={`
-              absolute right-2.5 top-1/2 -translate-y-1/2 z-10
-              w-[30px] h-[30px] rounded-full bg-white/85 border-none
-              flex items-center justify-center text-stone-600 text-sm
-              shadow-md transition-opacity duration-200
-              ${showArr ? 'opacity-100' : 'opacity-0'}
-              hover:bg-white
-            `}
-            onClick={e => changeImg(e, 1)}
-          >›</button>
-
-          {/* dot indicators */}
-          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-            {images.map((_, i) => (
+          {/* ARROWS */}
+          {showArr && (
+            <>
               <button
+                onClick={(e) => changeImg(e, -1)}
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-white p-1 rounded-full shadow"
+              >‹</button>
+
+              <button
+                onClick={(e) => changeImg(e, 1)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-white p-1 rounded-full shadow"
+              >›</button>
+            </>
+          )}
+
+          {/* DOTS */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+            {images.map((_, i) => (
+              <div
                 key={i}
-                onClick={e => { e.stopPropagation(); setImgIdx(i) }}
-                className={`
-                  h-[7px] rounded-full border border-white/60
-                  transition-all duration-300
-                  ${i === imgIdx ? 'w-5 bg-white' : 'w-[7px] bg-white/55'}
-                `}
+                onClick={(e) => { e.stopPropagation(); setImgIdx(i) }}
+                className={`h-2 rounded-full cursor-pointer transition-all 
+                  ${i === imgIdx ? 'w-4 bg-white' : 'w-2 bg-white/60'}`}
               />
             ))}
           </div>
         </div>
 
-        {/* ══════════════════════════════════
-            STATUS BADGES
-        ══════════════════════════════════ */}
-
-        {/* Booked badge */}
+        {/* BADGES */}
         {activeBooked && (
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5
-                          bg-white backdrop-blur-sm text-emerald-700
-                          text-[13px] font-bold px-3 py-[5px] rounded-full
-                          shadow-md tracking-[0.3px]">
-            <GiConfirmed size={14} /> Booked
+          <div className="absolute top-3 right-3 bg-white px-3 py-1 rounded-full flex items-center gap-1 text-green-600 text-sm shadow">
+            <GiConfirmed /> Booked
           </div>
         )}
 
-        {/* Expired badge — checkout passed */}
-        {isBooked && isExpired && (
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5
-                          bg-white/92 backdrop-blur-sm text-slate-500
-                          text-[12px] font-bold px-3 py-[5px] rounded-full shadow-md">
-            ✓ Stay Completed
-          </div>
-        )}
-
-        {/* Cancel button — only host can cancel, only if still active */}
         {activeBooked && host === userData?._id && (
           <button
-            className="absolute top-[46px] right-3 z-20 flex items-center gap-1.5
-                       bg-white/92 backdrop-blur-sm text-red-600
-                       text-[12px] font-bold px-3 py-[5px] rounded-full
-                       shadow-md border border-red-200/40
-                       hover:bg-red-50 transition-colors duration-200"
-            onClick={e => { e.stopPropagation(); setPopUp(true) }}
+            className="absolute top-12 right-3 bg-white px-3 py-1 rounded-full flex items-center gap-1 text-red-500 text-sm shadow"
+            onClick={(e) => { e.stopPropagation(); setPopUp(true) }}
           >
-            <FcCancel size={13} /> Cancel
+            <FcCancel /> Cancel
           </button>
         )}
 
-        {/* ══════════════════════════════════
-            INFO SECTION
-        ══════════════════════════════════ */}
-        <div className="px-4 pt-3.5 pb-4 flex flex-col gap-1.5">
-
-          {/* location + rating row */}
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1 text-[12px] font-semibold text-amber-700
-                             uppercase tracking-[0.8px] max-w-[75%] truncate">
-              <FaMapMarkerAlt size={10} className="text-amber-600 flex-shrink-0" />
-              {landMark}, {city}
+        {/* INFO */}
+        <div className="p-4">
+          <div className="flex justify-between items-center text-sm text-gray-600">
+            <span className="flex items-center gap-1 truncate">
+              <FaMapMarkerAlt /> {landMark}, {city}
             </span>
-            <span className="flex items-center gap-1 text-[13px] font-bold text-stone-700">
-              <FaStar size={12} className="text-amber-400" />
-              {avgRating}
+
+            <span className="flex items-center gap-1 font-semibold">
+              <FaStar className="text-yellow-500" /> {avgRating}
             </span>
           </div>
 
-          {/* title */}
-          <h3
-            className="text-[18px] font-bold text-stone-900 truncate leading-snug"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-          >
-            {title}
-          </h3>
+          <h3 className="font-semibold text-lg truncate">{title}</h3>
 
-          {/* price */}
-          <div className="flex items-baseline gap-1 mt-0.5">
-            <span className="text-[21px] font-bold text-amber-700">
-              ₹{Number(rent).toLocaleString('en-IN')}
-            </span>
-            <span className="text-[13px] text-stone-400 font-medium">/ night</span>
-          </div>
+          <p className="text-orange-600 font-bold text-lg">
+            ₹{rent}
+            <span className="text-sm text-gray-500"> / night</span>
+          </p>
         </div>
 
-        {/* ══════════════════════════════════
-            CANCEL CONFIRM DIALOG
-        ══════════════════════════════════ */}
+        {/* POPUP */}
         {popUp && (
-          <div
-            className="absolute inset-0 z-30 rounded-2xl flex items-center justify-center
-                       bg-stone-900/45 backdrop-blur-[3px]"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="card-popup bg-white rounded-2xl p-7 w-[260px] shadow-2xl
-                            flex flex-col items-center gap-4 text-center">
-              <span className="text-4xl">🗑️</span>
-              <div>
-                <p className="text-[19px] font-bold text-stone-800"
-                   style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Cancel Booking?
-                </p>
-                <p className="text-[13px] text-stone-500 mt-1">
-                  This action cannot be undone.
-                </p>
-              </div>
-              <div className="flex gap-2.5 w-full">
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <div className="card-popup bg-white p-5 rounded-xl text-center w-[260px]">
+              <p className="font-bold text-lg">Cancel Booking?</p>
+              <div className="flex gap-2 mt-3">
                 <button
-                  className="flex-1 py-2.5 rounded-xl border border-stone-200
-                             text-stone-600 font-semibold text-[14px]
-                             hover:bg-stone-50 transition-colors duration-150"
+                  className="flex-1 bg-gray-200 py-2 rounded"
                   onClick={() => setPopUp(false)}
                 >
-                  Keep
+                  No
                 </button>
                 <button
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-br from-red-500 to-red-700
-                             text-white font-bold text-[14px] shadow-md shadow-red-200
-                             hover:opacity-90 transition-opacity duration-150"
-                  onClick={() => { cancelBooking(id); setPopUp(false) }}
+                  className="flex-1 bg-red-500 text-white py-2 rounded"
+                  onClick={() => {
+                    cancelBooking(id)
+                    setPopUp(false)
+                  }}
                 >
-                  Cancel
+                  Yes
                 </button>
               </div>
             </div>
           </div>
         )}
+
       </div>
     </>
   )
 }
 
 export default Card
-
 
 
 // import React, { useContext } from 'react'
