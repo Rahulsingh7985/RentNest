@@ -1,281 +1,36 @@
-import React, { useContext, useState, useRef } from 'react'
+import React, { useContext, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { FaStar, FaMapMarkerAlt } from 'react-icons/fa'
+import { GiConfirmed } from 'react-icons/gi'
+import { FcCancel } from 'react-icons/fc'
 import { userDataContext } from '../Context/UserContext'
 import { listingDataContext } from '../Context/ListingContext'
-import { useNavigate } from 'react-router-dom'
-import { FaStar, FaMapMarkerAlt } from "react-icons/fa";
-import { GiConfirmed } from "react-icons/gi";
-import { FcCancel } from "react-icons/fc";
-import { bookingDataContext } from '../Context/BookingContext';
+import { bookingDataContext } from '../Context/BookingContext'
 
-/* ─── Inline styles (no extra CSS file needed) ─── */
-const styles = {
-  card: {
-    width: '340px',
-    maxWidth: '90vw',
-    borderRadius: '20px',
-    overflow: 'hidden',
-    background: '#fff',
-    boxShadow: '0 4px 24px rgba(80,40,20,0.10)',
-    cursor: 'pointer',
-    position: 'relative',
-    transition: 'transform 0.28s cubic-bezier(.22,.68,0,1.2), box-shadow 0.28s ease',
-    fontFamily: "'Cormorant Garamond', Georgia, serif",
-    border: '1px solid rgba(180,140,100,0.13)',
-  },
-  cardHover: {
-    transform: 'translateY(-6px) scale(1.012)',
-    boxShadow: '0 16px 48px rgba(80,40,20,0.18)',
-  },
+/* ─── tiny keyframe injection (only once) ─── */
+const STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');
+  @keyframes fadeInScale {
+    from { opacity: 0; transform: scale(.94); }
+    to   { opacity: 1; transform: scale(1);   }
+  }
+  .card-popup { animation: fadeInScale .18s ease both; }
+`
 
-  /* ── image carousel ── */
-  imageWrapper: {
-    position: 'relative',
-    width: '100%',
-    height: '220px',
-    overflow: 'hidden',
-    background: '#f0ebe4',
-  },
-  imageTrack: (idx) => ({
-    display: 'flex',
-    width: '300%',
-    height: '100%',
-    transform: `translateX(-${(idx * 100) / 3}%)`,
-    transition: 'transform 0.45s cubic-bezier(.77,0,.175,1)',
-  }),
-  image: {
-    width: '33.333%',
-    height: '100%',
-    objectFit: 'cover',
-    flexShrink: 0,
-  },
+function Card({ title, landMark, image1, image2, image3, rent, city, id, ratings, isBooked, host, checkOut }) {
+  const navigate    = useNavigate()
+  const { userData }        = useContext(userDataContext)
+  const { handleViewCard }  = useContext(listingDataContext)
+  const { cancelBooking }   = useContext(bookingDataContext)
 
-  /* dots */
-  dots: {
-    position: 'absolute',
-    bottom: '10px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    display: 'flex',
-    gap: '6px',
-    zIndex: 3,
-  },
-  dot: (active) => ({
-    width: active ? '20px' : '7px',
-    height: '7px',
-    borderRadius: '4px',
-    background: active ? '#fff' : 'rgba(255,255,255,0.55)',
-    border: '1px solid rgba(255,255,255,0.6)',
-    transition: 'width 0.3s ease, background 0.3s ease',
-  }),
+  const [popUp,   setPopUp]   = useState(false)
+  const [imgIdx,  setImgIdx]  = useState(0)
+  const [showArr, setShowArr] = useState(false)
 
-  /* nav arrows */
-  arrow: (side) => ({
-    position: 'absolute',
-    top: '50%',
-    [side]: '10px',
-    transform: 'translateY(-50%)',
-    zIndex: 4,
-    background: 'rgba(255,255,255,0.82)',
-    border: 'none',
-    borderRadius: '50%',
-    width: '30px',
-    height: '30px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    fontSize: '13px',
-    color: '#7a4a2a',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-    opacity: 0,
-    transition: 'opacity 0.2s ease',
-  }),
+  /* ── Auto-expire: treat as NOT booked if checkout date has passed ── */
+  const isExpired    = checkOut && new Date(checkOut) < new Date()
+  const activeBooked = isBooked && !isExpired   // what the UI actually shows
 
-  /* status badge */
-  bookedBadge: {
-    position: 'absolute',
-    top: '12px',
-    right: '12px',
-    zIndex: 5,
-    background: 'rgba(255,255,255,0.92)',
-    backdropFilter: 'blur(6px)',
-    color: '#2e7d4f',
-    borderRadius: '30px',
-    padding: '5px 12px',
-    fontSize: '13px',
-    fontWeight: 700,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.10)',
-    letterSpacing: '0.3px',
-  },
-  cancelBadge: {
-    position: 'absolute',
-    top: '46px',
-    right: '12px',
-    zIndex: 5,
-    background: 'rgba(255,255,255,0.92)',
-    backdropFilter: 'blur(6px)',
-    color: '#c0392b',
-    borderRadius: '30px',
-    padding: '5px 12px',
-    fontSize: '12px',
-    fontWeight: 700,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-    cursor: 'pointer',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.10)',
-    border: '1px solid rgba(192,57,43,0.18)',
-    transition: 'background 0.2s',
-  },
-
-  /* info section */
-  info: {
-    padding: '16px 18px 18px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  locationRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  location: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-    fontSize: '13px',
-    color: '#b07d55',
-    fontWeight: 600,
-    letterSpacing: '0.8px',
-    textTransform: 'uppercase',
-    fontFamily: "'Lato', sans-serif",
-    maxWidth: '75%',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  rating: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    fontSize: '14px',
-    fontWeight: 700,
-    color: '#4a3434',
-    fontFamily: "'Lato', sans-serif",
-  },
-  title: {
-    fontSize: '19px',
-    fontWeight: 700,
-    color: '#2d1e12',
-    letterSpacing: '0.2px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    lineHeight: 1.25,
-  },
-  price: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '3px',
-    marginTop: '2px',
-  },
-  priceAmount: {
-    fontSize: '22px',
-    fontWeight: 700,
-    color: '#b07d55',
-  },
-  priceLabel: {
-    fontSize: '13px',
-    color: '#a08070',
-    fontFamily: "'Lato', sans-serif",
-  },
-
-  /* ── confirm popup overlay ── */
-  overlay: {
-    position: 'absolute',
-    inset: 0,
-    background: 'rgba(30,15,5,0.45)',
-    backdropFilter: 'blur(3px)',
-    zIndex: 20,
-    borderRadius: '20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dialog: {
-    background: '#fff',
-    borderRadius: '16px',
-    padding: '28px 24px',
-    width: '260px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '18px',
-    textAlign: 'center',
-  },
-  dialogIcon: {
-    fontSize: '36px',
-    margin: '0 auto',
-  },
-  dialogTitle: {
-    fontSize: '20px',
-    fontWeight: 700,
-    color: '#2d1e12',
-    lineHeight: 1.2,
-  },
-  dialogSub: {
-    fontSize: '14px',
-    color: '#7a5a4a',
-    marginTop: '-10px',
-    fontFamily: "'Lato', sans-serif",
-  },
-  dialogActions: {
-    display: 'flex',
-    gap: '10px',
-  },
-  btnNo: {
-    flex: 1,
-    padding: '10px',
-    borderRadius: '10px',
-    border: '1.5px solid #d9c4b0',
-    background: '#fff',
-    color: '#7a5a4a',
-    fontSize: '15px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: "'Lato', sans-serif",
-    transition: 'background 0.2s',
-  },
-  btnYes: {
-    flex: 1,
-    padding: '10px',
-    borderRadius: '10px',
-    border: 'none',
-    background: 'linear-gradient(135deg, #e05c5c, #c0392b)',
-    color: '#fff',
-    fontSize: '15px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    fontFamily: "'Lato', sans-serif",
-    boxShadow: '0 4px 14px rgba(192,57,43,0.3)',
-    transition: 'opacity 0.2s',
-  },
-};
-
-function Card({ title, landMark, image1, image2, image3, rent, city, id, ratings, isBooked, host }) {
-  const navigate = useNavigate()
-  const { userData } = useContext(userDataContext)
-  const { handleViewCard } = useContext(listingDataContext)
-  const { cancelBooking } = useContext(bookingDataContext)
-
-  const [popUp, setPopUp] = useState(false)
-  const [imgIdx, setImgIdx] = useState(0)
-  const [hovered, setHovered] = useState(false)
-  const [showArrows, setShowArrows] = useState(false)
   const images = [image1, image2, image3]
 
   const handleClick = () => {
@@ -289,111 +44,210 @@ function Card({ title, landMark, image1, image2, image3, rent, city, id, ratings
     setImgIdx(i => (i + dir + 3) % 3)
   }
 
+  /* average rating display */
+  const avgRating = Array.isArray(ratings)
+    ? ratings.length
+      ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
+      : '—'
+    : ratings ?? '—'
+
   return (
     <>
-      {/* Google Fonts */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Lato:wght@400;600;700&display=swap');
-        .card-arrow { opacity: 0 !important; }
-        .card-wrap:hover .card-arrow { opacity: 1 !important; }
-        .cancel-badge:hover { background: rgba(255,230,230,0.95) !important; }
-        .btn-no:hover { background: #faf5f0 !important; }
-        .btn-yes:hover { opacity: 0.88; }
-      `}</style>
+      <style>{STYLE}</style>
 
       <div
-        className="card-wrap"
-        style={{ ...styles.card, ...(hovered ? styles.cardHover : {}) }}
-        onClick={!isBooked ? handleClick : undefined}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        className={`
+          relative  w-[340px] max-w-[92vw] rounded-2xl overflow-hidden bg-white
+          border border-stone-200/70
+          shadow-[0_4px_24px_rgba(80,40,20,0.10)]
+          hover:shadow-[0_16px_48px_rgba(80,40,20,0.18)]
+          hover:-translate-y-1.5 hover:scale-[1.012]
+          transition-all duration-300 ease-[cubic-bezier(.22,.68,0,1.2)]
+          cursor-pointer 
+        `}
+        style={{ fontFamily: "'DM Sans', sans-serif" }}
+        onClick={!activeBooked ? handleClick : undefined}
       >
-        {/* ── Image carousel ── */}
+
+        {/* ══════════════════════════════════
+            IMAGE CAROUSEL
+        ══════════════════════════════════ */}
         <div
-          style={styles.imageWrapper}
-          onMouseEnter={() => setShowArrows(true)}
-          onMouseLeave={() => setShowArrows(false)}
+          className="relative h-[220px] overflow-hidden bg-stone-100"
+          onMouseEnter={() => setShowArr(true)}
+          onMouseLeave={() => setShowArr(false)}
         >
-          <div style={styles.imageTrack(imgIdx)}>
+          {/* track */}
+          <div
+            className="flex h-full transition-transform duration-[450ms] ease-[cubic-bezier(.77,0,.175,1)]"
+            style={{ width: '300%', transform: `translateX(-${(imgIdx * 100) / 3}%)` }}
+          >
             {images.map((src, i) => (
-              <img key={i} src={src} alt={`${title} ${i + 1}`} style={styles.image} />
+              <img
+                key={i}
+                src={src}
+                alt={`${title} ${i + 1}`}
+                className="h-full object-cover flex-shrink-0"
+                style={{ width: '33.333%' }}
+              />
             ))}
           </div>
 
-          {/* Arrows */}
-          <button
-            className="card-arrow"
-            style={{ ...styles.arrow('left'), opacity: showArrows ? 1 : 0 }}
-            onClick={(e) => changeImg(e, -1)}
-          >&#8592;</button>
-          <button
-            className="card-arrow"
-            style={{ ...styles.arrow('right'), opacity: showArrows ? 1 : 0 }}
-            onClick={(e) => changeImg(e, 1)}
-          >&#8594;</button>
+          {/* dark gradient for readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
 
-          {/* Dots */}
-          <div style={styles.dots}>
+          {/* prev arrow */}
+          <button
+            className={`
+              absolute left-2.5 top-1/2 -translate-y-1/2 z-10
+              w-[30px] h-[30px] rounded-full bg-white/85 border-none
+              flex items-center justify-center text-stone-600 text-sm
+              shadow-md transition-opacity duration-200
+              ${showArr ? 'opacity-100' : 'opacity-0'}
+              hover:bg-white
+            `}
+            onClick={e => changeImg(e, -1)}
+          >‹</button>
+
+          {/* next arrow */}
+          <button
+            className={`
+              absolute right-2.5 top-1/2 -translate-y-1/2 z-10
+              w-[30px] h-[30px] rounded-full bg-white/85 border-none
+              flex items-center justify-center text-stone-600 text-sm
+              shadow-md transition-opacity duration-200
+              ${showArr ? 'opacity-100' : 'opacity-0'}
+              hover:bg-white
+            `}
+            onClick={e => changeImg(e, 1)}
+          >›</button>
+
+          {/* dot indicators */}
+          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
             {images.map((_, i) => (
-              <div key={i} style={styles.dot(i === imgIdx)} onClick={(e) => { e.stopPropagation(); setImgIdx(i) }} />
+              <button
+                key={i}
+                onClick={e => { e.stopPropagation(); setImgIdx(i) }}
+                className={`
+                  h-[7px] rounded-full border border-white/60
+                  transition-all duration-300
+                  ${i === imgIdx ? 'w-5 bg-white' : 'w-[7px] bg-white/55'}
+                `}
+              />
             ))}
           </div>
         </div>
 
-        {/* ── Badges ── */}
-        {isBooked && (
-          <div style={styles.bookedBadge}>
-            <GiConfirmed size={15} /> Booked
-          </div>
-        )}
-        {isBooked && host === userData?._id && (
-          <div
-            className="cancel-badge"
-            style={styles.cancelBadge}
-            onClick={(e) => { e.stopPropagation(); setPopUp(true) }}
-          >
-            <FcCancel size={14} /> Cancel
+        {/* ══════════════════════════════════
+            STATUS BADGES
+        ══════════════════════════════════ */}
+
+        {/* Booked badge */}
+        {activeBooked && (
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5
+                          bg-white backdrop-blur-sm text-emerald-700
+                          text-[13px] font-bold px-3 py-[5px] rounded-full
+                          shadow-md tracking-[0.3px]">
+            <GiConfirmed size={14} /> Booked
           </div>
         )}
 
-        {/* ── Info ── */}
-        <div style={styles.info}>
-          <div style={styles.locationRow}>
-            <span style={styles.location}>
-              <FaMapMarkerAlt size={11} color="#b07d55" />
+        {/* Expired badge — checkout passed */}
+        {isBooked && isExpired && (
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5
+                          bg-white/92 backdrop-blur-sm text-slate-500
+                          text-[12px] font-bold px-3 py-[5px] rounded-full shadow-md">
+            ✓ Stay Completed
+          </div>
+        )}
+
+        {/* Cancel button — only host can cancel, only if still active */}
+        {activeBooked && host === userData?._id && (
+          <button
+            className="absolute top-[46px] right-3 z-20 flex items-center gap-1.5
+                       bg-white/92 backdrop-blur-sm text-red-600
+                       text-[12px] font-bold px-3 py-[5px] rounded-full
+                       shadow-md border border-red-200/40
+                       hover:bg-red-50 transition-colors duration-200"
+            onClick={e => { e.stopPropagation(); setPopUp(true) }}
+          >
+            <FcCancel size={13} /> Cancel
+          </button>
+        )}
+
+        {/* ══════════════════════════════════
+            INFO SECTION
+        ══════════════════════════════════ */}
+        <div className="px-4 pt-3.5 pb-4 flex flex-col gap-1.5">
+
+          {/* location + rating row */}
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1 text-[12px] font-semibold text-amber-700
+                             uppercase tracking-[0.8px] max-w-[75%] truncate">
+              <FaMapMarkerAlt size={10} className="text-amber-600 flex-shrink-0" />
               {landMark}, {city}
             </span>
-            <span style={styles.rating}>
-              <FaStar size={13} color="#e8a020" /> {ratings}
+            <span className="flex items-center gap-1 text-[13px] font-bold text-stone-700">
+              <FaStar size={12} className="text-amber-400" />
+              {avgRating}
             </span>
           </div>
-          <div style={styles.title}>{title}</div>
-          <div style={styles.price}>
-            <span style={styles.priceAmount}>₹{rent.toLocaleString('en-IN')}</span>
-            <span style={styles.priceLabel}>/ night</span>
+
+          {/* title */}
+          <h3
+            className="text-[18px] font-bold text-stone-900 truncate leading-snug"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          >
+            {title}
+          </h3>
+
+          {/* price */}
+          <div className="flex items-baseline gap-1 mt-0.5">
+            <span className="text-[21px] font-bold text-amber-700">
+              ₹{Number(rent).toLocaleString('en-IN')}
+            </span>
+            <span className="text-[13px] text-stone-400 font-medium">/ night</span>
           </div>
         </div>
 
-        {/* ── Cancel confirmation dialog ── */}
+        {/* ══════════════════════════════════
+            CANCEL CONFIRM DIALOG
+        ══════════════════════════════════ */}
         {popUp && (
-          <div style={styles.overlay} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.dialog}>
-              <span style={styles.dialogIcon}>🗑️</span>
+          <div
+            className="absolute inset-0 z-30 rounded-2xl flex items-center justify-center
+                       bg-stone-900/45 backdrop-blur-[3px]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="card-popup bg-white rounded-2xl p-7 w-[260px] shadow-2xl
+                            flex flex-col items-center gap-4 text-center">
+              <span className="text-4xl">🗑️</span>
               <div>
-                <div style={styles.dialogTitle}>Cancel Booking?</div>
-                <div style={styles.dialogSub}>This action cannot be undone.</div>
+                <p className="text-[19px] font-bold text-stone-800"
+                   style={{ fontFamily: "'Playfair Display', serif" }}>
+                  Cancel Booking?
+                </p>
+                <p className="text-[13px] text-stone-500 mt-1">
+                  This action cannot be undone.
+                </p>
               </div>
-              <div style={styles.dialogActions}>
+              <div className="flex gap-2.5 w-full">
                 <button
-                  className="btn-no"
-                  style={styles.btnNo}
+                  className="flex-1 py-2.5 rounded-xl border border-stone-200
+                             text-stone-600 font-semibold text-[14px]
+                             hover:bg-stone-50 transition-colors duration-150"
                   onClick={() => setPopUp(false)}
-                >Keep</button>
+                >
+                  Keep
+                </button>
                 <button
-                  className="btn-yes"
-                  style={styles.btnYes}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-br from-red-500 to-red-700
+                             text-white font-bold text-[14px] shadow-md shadow-red-200
+                             hover:opacity-90 transition-opacity duration-150"
                   onClick={() => { cancelBooking(id); setPopUp(false) }}
-                >Cancel</button>
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -460,4 +314,4 @@ export default Card
 //     )
 // }
 
-// export default Card
+// export default Card 
