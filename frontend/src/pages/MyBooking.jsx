@@ -259,10 +259,6 @@ function MyBooking() {
               className="flex items-center gap-2 text-slate-500 hover:text-lime-700 font-semibold
                          text-sm transition-colors group bg-none border-none cursor-pointer"
             >
-              <span className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-lime-100
-                               flex items-center justify-center transition-colors text-sm">
-                ←
-              </span>
               Home
             </button>
 
