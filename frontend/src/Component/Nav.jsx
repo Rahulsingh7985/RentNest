@@ -66,10 +66,10 @@ function Nav() {
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY
-            if (currentScrollY > lastScrollY && currentScrollY > 80) {
-                setShowCategories(false) // scrolling down → hide
-            } else {
-                setShowCategories(true)  // scrolling up → show
+            if ( currentScrollY > 80) {
+                setShowCategories(false) 
+            } else if(currentScrollY < 10) {
+                setShowCategories(true)  
             }
             setLastScrollY(currentScrollY)
         }
