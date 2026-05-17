@@ -25,6 +25,9 @@ app.use("/api/listing",listingRouter )
 app.use("/api/booking",bookingRouter )
 app.use("/api/payment", paymentRouter);
 
+app.get("/health", (req, res) => {
+    res.status(200).send("OK");
+});
 
 app.listen(port,()=>{
     connectDb()
